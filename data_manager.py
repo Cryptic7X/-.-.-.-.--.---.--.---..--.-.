@@ -9,6 +9,7 @@ import pandas as pd
 import ccxt
 import json
 import time
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
