@@ -6,6 +6,10 @@ GitHub Actions Crypto Analytics V3.0 - Scheduled Mode
 Optimized for hybrid 0,5,15,30,45 minute schedule
 """
 
+"""
+GitHub Actions Crypto Analytics V3.0 - WITH BLOCKED COINS SUPPORT
+"""
+
 import os
 import sys
 import time
@@ -17,7 +21,7 @@ import logging
 from data_manager import CoinGeckoManager, MultiExchangeManager
 from analyzers import TrendPulseAnalyzer, StochRSICalculator, HeikinAshiConverter
 from alert_system import TelegramAlertManager, ChartURLResolver, DeduplicationManager
-from utils import setup_logging, format_price
+from utils import setup_logging, format_price, load_blocked_coins  # Added load_blocked_coins
 
 MAX_WORKERS = 2
 BASE_DIR = Path(__file__).parent
@@ -32,6 +36,9 @@ class GitHubActionsAnalytics:
         self.logger = setup_logging(LOGS_DIR / "github_actions.log")
         self.logger.info("🚀 GitHub Actions Crypto Analytics V3.0")
         
+        # Load blocked coins at startup
+        self.blocked_coins = load_blocked_coins()  # ADDED THIS
+        
         self.coingecko = CoinGeckoManager(CACHE_DIR)
         self.exchange = MultiExchangeManager()
         self.trendpulse = TrendPulseAnalyzer()
@@ -45,20 +52,13 @@ class GitHubActionsAnalytics:
         self.total_signals = 0
         self.total_alerts = 0
 
-    def get_coins(self):
-        self.logger.info("🌐 Fetching CoinGecko data")
-        data, calls = self.coingecko.get_dual_tier_coins()
-        total = len(data['high_risk']) + len(data['standard'])
-        self.logger.info(f"✅ Got {total} coins ({calls} API calls)")
-        return data
-
-    def fetch_market_data(self, symbol):
-        timeframes = {'1h': 50, '2h': 100}
-        return self.exchange.get_multi_timeframe_data(symbol, timeframes)
-
     def analyze_coin(self, coin, tier):
         try:
             symbol = coin['symbol']
+            
+            # BLOCKED COINS CHECK - ADDED THIS
+            if symbol.upper() in self.blocked_coins:
+                return None, f"🚫 BLOCKED: {symbol}"
             
             # Get market data
             data = self.fetch_market_data(symbol)
@@ -112,6 +112,7 @@ class GitHubActionsAnalytics:
             
         except Exception as e:
             return None, f"❌ Error {symbol}: {str(e)[:50]}"
+
 
     def process_signals(self, results):
         sent = 0
