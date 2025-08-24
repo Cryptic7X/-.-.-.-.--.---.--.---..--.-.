@@ -1,13 +1,8 @@
 
 
-
 """
-GitHub Actions Crypto Analytics V3.0 - Scheduled Mode
-Optimized for hybrid 0,5,15,30,45 minute schedule
-"""
-
-"""
-GitHub Actions Crypto Analytics V3.0 - WITH BLOCKED COINS SUPPORT
+GitHub Actions Crypto Analytics V3.0 - COMPLETE FIXED VERSION
+All methods properly defined with blocked coins support
 """
 
 import os
@@ -21,7 +16,7 @@ import logging
 from data_manager import CoinGeckoManager, MultiExchangeManager
 from analyzers import TrendPulseAnalyzer, StochRSICalculator, HeikinAshiConverter
 from alert_system import TelegramAlertManager, ChartURLResolver, DeduplicationManager
-from utils import setup_logging, format_price, load_blocked_coins  # Added load_blocked_coins
+from utils import setup_logging, format_price, load_blocked_coins
 
 MAX_WORKERS = 2
 BASE_DIR = Path(__file__).parent
@@ -36,9 +31,10 @@ class GitHubActionsAnalytics:
         self.logger = setup_logging(LOGS_DIR / "github_actions.log")
         self.logger.info("🚀 GitHub Actions Crypto Analytics V3.0")
         
-        # Load blocked coins at startup
-        self.blocked_coins = load_blocked_coins()  # ADDED THIS
+        # Load blocked coins
+        self.blocked_coins = load_blocked_coins()
         
+        # Initialize components
         self.coingecko = CoinGeckoManager(CACHE_DIR)
         self.exchange = MultiExchangeManager()
         self.trendpulse = TrendPulseAnalyzer()
@@ -52,17 +48,37 @@ class GitHubActionsAnalytics:
         self.total_signals = 0
         self.total_alerts = 0
 
+    def get_coins(self):
+        """FIXED: Added missing get_coins method"""
+        self.logger.info("🌐 Fetching CoinGecko data")
+        try:
+            data, calls = self.coingecko.get_dual_tier_coins()
+            total = len(data['high_risk']) + len(data['standard'])
+            self.logger.info(f"✅ Got {total} coins ({calls} API calls)")
+            return data
+        except Exception as e:
+            self.logger.error(f"❌ CoinGecko error: {e}")
+            # Try cached data as fallback
+            data, _ = self.coingecko.get_cached_coins()
+            return data
+
+    def fetch_market_data(self, symbol):
+        """Fetch multi-timeframe market data"""
+        timeframes = {'1h': 50, '2h': 100}
+        return self.exchange.get_multi_timeframe_data(symbol, timeframes)
+
     def analyze_coin(self, coin, tier):
+        """Complete coin analysis with blocked coins check"""
         try:
             symbol = coin['symbol']
             
-            # BLOCKED COINS CHECK - ADDED THIS
+            # Check blocked coins
             if symbol.upper() in self.blocked_coins:
                 return None, f"🚫 BLOCKED: {symbol}"
             
             # Get market data
             data = self.fetch_market_data(symbol)
-            if not data:
+            if not data or '1h' not in data or '2h' not in data:
                 return None, f"❌ No data: {symbol}"
             
             # Convert to Heikin Ashi
@@ -113,44 +129,50 @@ class GitHubActionsAnalytics:
         except Exception as e:
             return None, f"❌ Error {symbol}: {str(e)[:50]}"
 
-
     def process_signals(self, results):
+        """Process and send alerts for confirmed signals"""
         sent = 0
         self.logger.info(f"🚨 Processing {len(results)} signals")
         
         for result in results:
-            coin = result['coin']
-            signal = result['signal']
-            tier = result['tier']
-            
-            # Check for duplicates
-            if self.deduplication.is_duplicate(coin, signal):
-                self.logger.info(f"🔄 Duplicate prevented: {coin['symbol']}")
-                continue
-            
-            # Get chart URL
-            chart_url, exchange = self.chart_resolver.get_working_chart_url(coin['symbol'])
-            signal['chart_url'] = chart_url
-            signal['chart_exchange'] = exchange
-            
-            # Send alert
-            if self.telegram.send_alert(coin, signal, tier):
-                self.deduplication.mark_sent(coin, signal)
-                sent += 1
-                price = format_price(coin['current_price'])
-                self.logger.info(f"✅ Alert sent: {coin['symbol']} {signal['signal_type']} @ {price}")
+            try:
+                coin = result['coin']
+                signal = result['signal']
+                tier = result['tier']
                 
-                # Cooldown between alerts
-                if sent < len(results):
-                    time.sleep(10)
+                # Check for duplicates
+                if self.deduplication.is_duplicate(coin, signal):
+                    self.logger.info(f"🔄 Duplicate prevented: {coin['symbol']}")
+                    continue
+                
+                # Get chart URL
+                chart_url, exchange = self.chart_resolver.get_working_chart_url(coin['symbol'])
+                signal['chart_url'] = chart_url
+                signal['chart_exchange'] = exchange
+                
+                # Send alert
+                if self.telegram.send_alert(coin, signal, tier):
+                    self.deduplication.mark_sent(coin, signal)
+                    sent += 1
+                    price = format_price(coin['current_price'])
+                    self.logger.info(f"✅ Alert sent: {coin['symbol']} {signal['signal_type']} @ {price}")
+                    
+                    # Cooldown between alerts
+                    if sent < len(results):
+                        time.sleep(10)
+                        
+            except Exception as e:
+                self.logger.error(f"❌ Alert error: {str(e)[:50]}")
+                continue
         
         return sent
 
     def run(self):
+        """Main execution method - FIXED"""
         try:
             self.logger.info("🔄 Starting scheduled analysis")
             
-            # Get coin data
+            # Get coin data - FIXED METHOD CALL
             coin_data = self.get_coins()
             high_risk = coin_data['high_risk']
             standard = coin_data['standard']
@@ -158,6 +180,8 @@ class GitHubActionsAnalytics:
             if not high_risk and not standard:
                 self.logger.warning("⚠️ No coins to analyze")
                 return 0
+            
+            self.logger.info(f"📊 Analyzing {len(high_risk)} HIGH RISK + {len(standard)} STANDARD coins")
             
             results = []
             
@@ -168,15 +192,17 @@ class GitHubActionsAnalytics:
                 futures.extend([executor.submit(self.analyze_coin, coin, 'HIGH_RISK') for coin in high_risk])
                 futures.extend([executor.submit(self.analyze_coin, coin, 'STANDARD') for coin in standard])
                 
-                # Collect results
-                for future in futures:
+                # Collect results with timeout protection
+                for i, future in enumerate(futures, 1):
                     try:
                         result, log = future.result(timeout=30)
-                        self.logger.info(log)
+                        if i <= 5 or i % 20 == 0 or result:  # Log first 5, every 20th, and all signals
+                            self.logger.info(f"[{i}/{len(futures)}] {log}")
                         if result:
                             results.append(result)
                     except Exception as e:
-                        self.logger.error(f"Analysis timeout: {e}")
+                        if i <= 5:  # Only log first few timeouts
+                            self.logger.error(f"[{i}/{len(futures)}] Timeout: {str(e)[:30]}")
             
             # Send alerts
             self.total_signals = len(results)
@@ -192,6 +218,7 @@ class GitHubActionsAnalytics:
             return -1
 
 def main():
+    """Main entry point"""
     print("🚀 CRYPTO ANALYTICS V3.0 - GitHub Actions")
     print("=" * 50)
     print("🔥 1H TrendPulse + 2H StochRSI Confirmation")
@@ -216,4 +243,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
