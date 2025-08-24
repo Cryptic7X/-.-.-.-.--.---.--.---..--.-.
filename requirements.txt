@@ -1,50 +1,17 @@
-"""
-REQUIREMENTS FILE - Python Dependencies
-Install with: pip install -r requirements.txt
-"""
-
 # Core data processing
-pandas>=2.0.0
-numpy>=1.24.0
+pandas>=2.3.2
+numpy>=1.26.4
 
 # Cryptocurrency exchange integration
-ccxt>=4.0.0
+ccxt>=4.4.97
 
-# HTTP requests and web scraping
-requests>=2.28.0
+# HTTP requests
+requests>=2.31.0
 
-# Data visualization and technical analysis
-ta-lib>=0.4.0  # Optional: For additional technical indicators
+# Environment variables
+python-dotenv>=1.0.1
 
-# Configuration and environment
-python-dotenv>=1.0.0  # For loading .env files
+# Additional useful packages (optional but recommended)
+aiohttp>=3.9.5
+websocket-client>=1.8.0
 
-# Async support (if needed for future enhancements)
-asyncio>=3.4.0
-
-# JSON handling (built-in, but listed for clarity)
-# json - built-in module
-
-# Date and time handling (built-in)
-# datetime - built-in module
-
-# Logging (built-in)
-# logging - built-in module
-
-# File system operations (built-in)
-# pathlib - built-in module
-
-# Threading for parallel processing (built-in)
-# concurrent.futures - built-in module
-
-# Hash functions for cache keys (built-in)
-# hashlib - built-in module
-
-# Operating system interface (built-in)
-# os - built-in module
-
-# System-specific parameters (built-in)
-# sys - built-in module
-
-# Time-related functions (built-in)
-# time - built-in module
