@@ -1,8 +1,8 @@
+
 name: Crypto Analytics V3.0 - Hybrid Schedule
 
 on:
   schedule:
-    # Every hour at 0 and 5, then at 15, 30, 45 minutes
     - cron: '0,5,15,30,45 * * * *'
   workflow_dispatch:
 
@@ -30,31 +30,23 @@ jobs:
         mkdir -p cache
         mkdir -p logs
 
-    - name: Run Scheduled Crypto Analytics
+    - name: Run Crypto Analytics
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        HIGH_RISK_CHAT_ID:     ${{ secrets.HIGH_RISK_CHAT_ID }}
-        TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
-        BINGX_API_KEY:         ${{ secrets.BINGX_API_KEY }}
-        BINGX_SECRET_KEY:      ${{ secrets.BINGX_SECRET_KEY }}
-        COINGECKO_API_KEY:     ${{ secrets.COINGECKO_API_KEY }}
-        GITHUB_ACTIONS_MODE:   "true"
+        HIGH_RISK_CHAT_ID: ${{ secrets.HIGH_RISK_CHAT_ID }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        BINGX_API_KEY: ${{ secrets.BINGX_API_KEY }}
+        BINGX_SECRET_KEY: ${{ secrets.BINGX_SECRET_KEY }}
+        COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        GITHUB_ACTIONS_MODE: "true"
       run: |
-        echo "🚀 Starting Crypto Analytics V3.0 - Hybrid Schedule"
+        echo "🚀 Starting Crypto Analytics V3.0"
         python main_scheduled.py
 
     - name: Upload logs on failure
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: crypto-analytics-logs
         path: logs/
         retention-days: 7
-
-    - name: Display recent logs
-      if: always()
-      run: |
-        echo "📈 Execution complete at $(date)"
-        if [ -f "logs/github_actions.log" ]; then
-          tail -n 10 logs/github_actions.log
-        fi
