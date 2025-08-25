@@ -150,15 +150,16 @@ class TrendPulseAnalyzer:
             wt1_previous = float(wt1.iloc[-3])  # Previous closed
             wt2_previous = float(wt2.iloc[-3])
             
-            # Tier-specific thresholds (your exact settings)
+            # In TrendPulseAnalyzer.analyze() for HIGH_RISK
             if tier_type == "HIGH_RISK":
-                # 1H analysis - More sensitive thresholds
-                oversold = (wt1_current <= -50) and (wt2_current <= -50)
-                overbought = (wt1_current >= 50) and (wt2_current >= 50)
-            else:  # STANDARD
-                # 1H analysis - Standard thresholds
-                oversold = (wt1_current <= -60) and (wt2_current <= -60)
-                overbought = (wt1_current >= 60) and (wt2_current >= 60)
+                # FIXED: Use your exact HIGH_RISK thresholds
+                oversold   = (wt1_current <= -60) and (wt2_current <= -60)
+                overbought = (wt1_current >= 60)  and (wt2_current >= 60)
+            else:
+                # STANDARD (no change)
+                oversold   = (wt1_current <= -60) and (wt2_current <= -60)
+                overbought = (wt1_current >= 60)  and (wt2_current >= 60)
+
             
             # Cross detection (your exact logic)
             bullish_cross = (wt1_previous <= wt2_previous) and (wt1_current > wt2_current)
