@@ -37,6 +37,7 @@ JITOSOL
 WSTETH
 
 # Meme coins (too volatile)
+PI
 NFT
 AUSD
 AMP
