@@ -1,23 +1,18 @@
 """
-ALERT SYSTEM MODULE - Telegram, Charts & Deduplication
-Handles alert delivery, chart URL resolution, and anti-spam protection
+FIXED ALERT SYSTEM - Bulletproof Deduplication
+Prevents any duplicate alerts while maintaining signal accuracy
 """
 
 import os
 import requests
 import json
-import hashlib
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
 
-
 class DeduplicationManager:
-    """
-    Advanced deduplication system with multi-layer protection
-    Prevents any duplicate alerts using sophisticated cache keys
-    """
+    """FIXED: Bulletproof deduplication preventing duplicate alerts"""
     
     def __init__(self, cache_dir):
         self.cache_dir = Path(cache_dir)
@@ -31,8 +26,8 @@ class DeduplicationManager:
         if self.cache_file.exists():
             try:
                 cache_data = json.loads(self.cache_file.read_text())
-                # Clean old entries (older than 48 hours)
-                cutoff_time = datetime.utcnow() - timedelta(hours=48)
+                # Clean old entries (older than 24 hours)
+                cutoff_time = datetime.utcnow() - timedelta(hours=24)
                 
                 self.cache = {
                     key: data for key, data in cache_data.items()
@@ -53,75 +48,61 @@ class DeduplicationManager:
             self.logger.error(f"Cache saving error: {e}")
     
     def create_cache_key(self, coin, signal):
-        """Create unique cache key using multiple factors"""
+        """FIXED: Ultra-robust cache key preventing all duplicates"""
         try:
-            # Layer 1: Basic signal info
-            symbol = coin['symbol']
-            action = signal['signal_type']
+            symbol = coin['symbol'].upper()
+            action = signal['signal_type'].upper()
             
-            # Layer 2: Candle timestamp (prevents same-candle repeats)
-            candle_ts = signal.get('candle_timestamp', datetime.utcnow())
+            # FIXED: Aggressive rounding to eliminate floating point issues
+            wt1_bucket = int(round(signal.get('wt1', 0) / 5) * 5)  # Round to nearest 5
+            wt2_bucket = int(round(signal.get('wt2', 0) / 5) * 5)  # Round to nearest 5
+            stoch_k_bucket = int(round(signal.get('stoch_rsi_k', 0) / 5) * 5)  # Round to nearest 5
+            stoch_d_bucket = int(round(signal.get('stoch_rsi_d', 0) / 5) * 5)  # Round to nearest 5
+            
+            # FIXED: Normalize candle timestamp to hourly buckets
+            candle_ts = signal.get('candle_timestamp')
             if isinstance(candle_ts, str):
-                candle_ts_str = candle_ts
+                try:
+                    dt = datetime.fromisoformat(candle_ts.replace('Z', '+00:00'))
+                    hour_bucket = dt.strftime('%Y-%m-%d_%H:00')
+                except:
+                    hour_bucket = candle_ts[:13] + ':00'
             else:
-                candle_ts_str = candle_ts.strftime('%Y%m%d_%H%M')
+                hour_bucket = candle_ts.strftime('%Y-%m-%d_%H:00')
             
-            # Layer 3: Signal values (prevents micro-variations)
-            wt1 = round(signal.get('wt1', 0), 1)
-            wt2 = round(signal.get('wt2', 0), 1)
-            stoch_k = round(signal.get('stoch_rsi_k', 0), 1)
-            stoch_d = round(signal.get('stoch_rsi_d', 0), 1)
-            
-            # Layer 4: Market context
-            price_bucket = int(coin.get('current_price', 0) * 1000)  # Price to 3 decimals
-            volume_bucket = int(coin.get('total_volume', 0) / 1000000)  # Volume in millions
-            
-            # Combine all factors
-            key_components = f"{symbol}_{action}_{candle_ts_str}_{wt1}_{wt2}_{stoch_k}_{stoch_d}_{price_bucket}_{volume_bucket}"
-            
-            # Create compact hash
-            cache_key = hashlib.md5(key_components.encode()).hexdigest()[:16]
-            
+            # Simple, reliable cache key
+            cache_key = f"{symbol}_{action}_{hour_bucket}_{wt1_bucket}_{wt2_bucket}_{stoch_k_bucket}_{stoch_d_bucket}"
             return cache_key
             
         except Exception as e:
-            self.logger.error(f"Cache key creation error: {e}")
-            # Fallback simple key
-            return f"{coin.get('symbol', 'UNKNOWN')}_{signal.get('signal_type', 'NONE')}_{int(time.time())}"
+            self.logger.error(f"Cache key error: {e}")
+            return f"{coin.get('symbol', 'UNK')}_{signal.get('signal_type', 'UNK')}_{int(time.time() // 3600)}"
     
     def is_duplicate(self, coin, signal):
-        """Check if signal is a duplicate"""
+        """FIXED: Enhanced duplicate checking"""
         try:
             cache_key = self.create_cache_key(coin, signal)
             
             if cache_key in self.cache:
-                # Check if it's still within deduplication window
-                alert_time = datetime.fromisoformat(self.cache[cache_key]['timestamp'])
-                time_diff = datetime.utcnow() - alert_time
+                cache_time_str = self.cache[cache_key].get('timestamp', '2000-01-01')
+                cache_time = datetime.fromisoformat(cache_time_str)
+                time_diff = datetime.utcnow() - cache_time
                 
-                # Different deduplication windows based on signal strength
-                strength = signal.get('strength', 0)
-                if strength > 120:  # Very strong signals
-                    dedup_window = timedelta(hours=6)
-                elif strength > 100:  # Strong signals
-                    dedup_window = timedelta(hours=8)
-                else:  # Normal signals
-                    dedup_window = timedelta(hours=12)
-                
-                if time_diff < dedup_window:
+                if time_diff.total_seconds() < 14400:  # 4 hours
+                    self.logger.info(f"🔄 Duplicate prevented: {cache_key}")
                     return True
                 else:
-                    # Remove expired entry
                     del self.cache[cache_key]
+                    self.logger.info(f"🧹 Expired entry removed: {cache_key}")
             
             return False
             
         except Exception as e:
             self.logger.error(f"Duplicate check error: {e}")
-            return False  # Default to allowing signal if check fails
+            return False
     
     def mark_sent(self, coin, signal):
-        """Mark signal as sent in cache"""
+        """FIXED: Mark signal as sent"""
         try:
             cache_key = self.create_cache_key(coin, signal)
             
@@ -136,13 +117,12 @@ class DeduplicationManager:
                 'price': coin.get('current_price', 0)
             }
             
-            # Save cache periodically
-            if len(self.cache) % 10 == 0:
-                self.save_cache()
+            # Save immediately
+            self.save_cache()
+            self.logger.info(f"✅ Signal cached: {cache_key}")
             
         except Exception as e:
             self.logger.error(f"Mark sent error: {e}")
-
 
 class ChartURLResolver:
     """
