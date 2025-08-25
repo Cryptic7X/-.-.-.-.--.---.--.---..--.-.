@@ -95,26 +95,30 @@ class GitHubActionsAnalytics:
             stoch = self.stochrsi.calculate(data['2h'])
             if not stoch:
                 return None, f"❌ StochRSI failed: {symbol}"
-            
-            # Apply confirmation logic
+
+            # Apply confirmation logic  
             signal_type = tp_signal['signal_type']
             k, d = stoch['current_k'], stoch['current_d']
             
+            # FIXED: Handle both 0-1 and 0-100 scales
+            k_scaled = k * 100 if k <= 1 else k
+            d_scaled = d * 100 if d <= 1 else d
+            
             if signal_type == 'BUY':
-                confirmed = k < 20 and d < 20
-                reason = f"StochRSI_2H_Oversold(K:{k:.1f},D:{d:.1f})"
+                confirmed = k_scaled < 20 and d_scaled < 20
+                reason = f"StochRSI_2H_Oversold(K:{k_scaled:.1f},D:{d_scaled:.1f})"
             else:  # SELL
-                confirmed = k > 80 and d > 80
-                reason = f"StochRSI_2H_Overbought(K:{k:.1f},D:{d:.1f})"
+                confirmed = k_scaled > 80 and d_scaled > 80
+                reason = f"StochRSI_2H_Overbought(K:{k_scaled:.1f},D:{d_scaled:.1f})"
             
             if not confirmed:
-                return None, f"📊 No StochRSI confirmation: {symbol}"
+                return None, f"📊 No StochRSI confirmation: {symbol} - {reason}"
             
             # Create confirmed signal
             signal = {
                 **tp_signal,
-                'stoch_rsi_k': k,
-                'stoch_rsi_d': d,
+                'stoch_rsi_k': k_scaled,  # Use scaled values
+                'stoch_rsi_d': d_scaled,
                 'confirmation_reason': reason,
                 'candle_timestamp': ha_df.index[-2],
                 'github_run_time': datetime.utcnow().isoformat()
@@ -125,6 +129,7 @@ class GitHubActionsAnalytics:
                 'signal': signal,
                 'tier': tier
             }, f"✅ CONFIRMED {signal_type}: {symbol} ({reason})"
+
             
         except Exception as e:
             return None, f"❌ Error {symbol}: {str(e)[:50]}"
