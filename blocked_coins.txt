@@ -38,6 +38,7 @@ WSTETH
 
 # Meme coins (too volatile)
 NFT
+AUSD
 AMP
 SNEK
 TROLL
