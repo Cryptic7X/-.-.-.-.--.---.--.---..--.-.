@@ -39,6 +39,7 @@ WSTETH
 # Meme coins (too volatile)
 PI
 NFT
+FTN
 AUSD
 AMP
 SNEK
